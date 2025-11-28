@@ -1,17 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Login — Secure Web</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>My Secure Web App</h1>
+      <nav>
+        <a href="index.html">Home</a>
+      </nav>
+    </header>
+    <main>
+      <h2>Login</h2>
+      <form method="POST" action="#">
+        <label>Email:</label>
+        <input name="email" type="email" required>
+        <label>Password:</label>
+        <input name="password" type="password" required>
+        <button type="submit">Login</button>
+      </form>
+    </main>
+  </body>
+</html>
 
-{% extends 'base.html' %}
-
-{% block content %}
-  <h2>Login</h2>
-  <form method="POST">
-    <!-- Add CSRF token here (e.g. using Flask-WTF: {{ form.hidden_tag() }} or your csrf token helper) -->
-    {{ csrf_token() }}
-    <label>Email:</label>
-    <input name="email" type="email" required>
-    <label>Password:</label>
-    <input name="password" type="password" required>
-    <button type="submit">Login</button>
-  </form>
-
-  <p style="color:red">{{ error }}</p>
-{% endblock %}
