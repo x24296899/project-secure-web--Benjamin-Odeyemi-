@@ -14,14 +14,58 @@
     </header>
     <main>
       <h2>Login</h2>
-      <form method="POST" action="#">
+      <form id="loginForm" method="POST" action="#">
         <label>Email:</label>
-        <input name="email" type="email" required>
+        <input id="loginEmail" name="email" type="email" required>
         <label>Password:</label>
-        <input name="password" type="password" required>
+        <input id="loginPassword" name="password" type="password" required>
+        <label>Role:</label>
+        <select id="loginRole" name="role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
         <button type="submit">Login</button>
       </form>
+      <p id="loginMessage" style="color:red"></p>
     </main>
+    <script type="module">
+      import { verifyCredentials, setSession, getUser, ensureSeeded } from './users.js';
+
+      // Ensure admin seeded for demo
+      ensureSeeded();
+
+      const form = document.getElementById('loginForm');
+      const msg = document.getElementById('loginMessage');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const selectedRole = document.getElementById('loginRole').value;
+        try {
+          const ok = await verifyCredentials(email, password);
+          if (!ok) {
+            msg.textContent = 'Invalid credentials.';
+            return;
+          }
+          const user = await getUser(email);
+          if (!user) {
+            msg.textContent = 'User record not found.';
+            return;
+          }
+          if ((user.role || 'user') !== selectedRole) {
+            msg.textContent = `Role mismatch: account is '${user.role || 'user'}'`;
+            return;
+          }
+          setSession(email);
+          // Redirect to generic home which routes by role
+          location.href = 'home.html';
+        } catch (err) {
+          console.error(err);
+          msg.textContent = 'Login failed';
+        }
+      });
+    </script>
   </body>
 </html>
 

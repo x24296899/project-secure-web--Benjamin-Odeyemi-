@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Dashboard — Secure Web</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>My Secure Web App</h1>
+      <nav>
+        <a href="index.html">Home</a>
+      </nav>
+    </header>
+    <main>
+      <h2>User Dashboard</h2>
+      <p id="welcome"></p>
+      <p>Your account details:</p>
+      <ul>
+        <li id="emailLi"></li>
+        <li id="roleLi"></li>
+        <li id="createdLi"></li>
+      </ul>
+      <button id="logoutBtn">Logout</button>
+    </main>
+    <script type="module">
+      import { getSession, clearSession, getUser } from './users.js';
+
+      const welcome = document.getElementById('welcome');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const emailLi = document.getElementById('emailLi');
+      const roleLi = document.getElementById('roleLi');
+      const createdLi = document.getElementById('createdLi');
+
+      (async function init() {
+        const email = getSession();
+        if (!email) {
+          location.href = 'login.html';
+          return;
+        }
+        const user = await getUser(email);
+        if (!user) {
+          location.href = 'login.html';
+          return;
+        }
+        // If admin, send to admin panel
+        if (user.role === 'admin') {
+          location.href = 'admin.html';
+          return;
+        }
+        welcome.textContent = `Welcome, ${email}`;
+        emailLi.textContent = `Email: ${user.email}`;
+        roleLi.textContent = `Role: ${user.role || 'user'}`;
+        createdLi.textContent = `Created: ${new Date(user.createdAt).toLocaleString()}`;
+      })();
+
+      logoutBtn.addEventListener('click', () => {
+        clearSession();
+        location.href = 'index.html';
+      });
+    </script>
+  </body>
+</html>

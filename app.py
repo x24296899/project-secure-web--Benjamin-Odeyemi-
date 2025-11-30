@@ -10,7 +10,6 @@ USERS = {}
 
 @app.context_processor
 def inject_helpers():
-    # Provide a csrf_token placeholder so templates can call {{ csrf_token() }}
     def csrf_token():
         return ''
     return dict(csrf_token=csrf_token)

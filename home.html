@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Home — Secure Web</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>My Secure Web App</h1>
+      <nav>
+        <a href="index.html">Home</a>
+      </nav>
+    </header>
+    <main>
+      <h2>Home</h2>
+      <p id="welcome"></p>
+      <div id="links"></div>
+      <button id="logout">Logout</button>
+    </main>
+    <script type="module">
+      import { getSession, clearSession, getUser } from './users.js';
+
+      const welcome = document.getElementById('welcome');
+      const links = document.getElementById('links');
+      const logout = document.getElementById('logout');
+
+      (async function init() {
+        const email = getSession();
+        if (!email) {
+          location.href = 'login.html';
+          return;
+        }
+        const user = await getUser(email);
+        welcome.textContent = `Welcome, ${email} (${user.role || 'user'})`;
+        links.innerHTML = '';
+        if (user.role === 'admin') {
+          links.innerHTML += `<p><a href="admin.html">Go to Admin Panel</a></p>`;
+        }
+        links.innerHTML += `<p><a href="dashboard.html">Go to Dashboard</a></p>`;
+      })();
+
+      logout.addEventListener('click', () => {
+        clearSession();
+        location.href = 'index.html';
+      });
+    </script>
+  </body>
+</html>

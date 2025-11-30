@@ -14,16 +14,78 @@
     </header>
     <main>
       <h2>Register</h2>
-      <form method="POST" action="#">
+      <form id="registerForm" method="POST" action="#">
         <label>Email:</label>
-        <input name="email" type="email" required>
+        <input id="regEmail" name="email" type="email" required>
 
         <label>Password:</label>
-        <input name="password" type="password" required>
+        <input id="regPassword" name="password" type="password" required>
+
+        <div id="pwRequirements">
+          <p>Password must meet the following:</p>
+          <ul>
+            <li id="pwLen">• At least 8 characters</li>
+            <li id="pwUpper">• At least one uppercase letter (A-Z)</li>
+            <li id="pwNumber">• At least one number (0-9)</li>
+            <li id="pwSymbol">• At least one symbol (e.g. !@#$%)</li>
+          </ul>
+        </div>
 
         <input type="hidden" name="role" value="user">
         <button type="submit">Register</button>
       </form>
+      <p id="regMessage" style="color:red"></p>
     </main>
+    <script type="module">
+      import { addUser, setSession } from './users.js';
+
+      const form = document.getElementById('registerForm');
+      const msg = document.getElementById('regMessage');
+      const pwInput = document.getElementById('regPassword');
+      const reqLen = document.getElementById('pwLen');
+      const reqUpper = document.getElementById('pwUpper');
+      const reqNumber = document.getElementById('pwNumber');
+      const reqSymbol = document.getElementById('pwSymbol');
+
+      function checkPasswordRequirements(pw) {
+        return {
+          length: pw.length >= 8,
+          upper: /[A-Z]/.test(pw),
+          number: /[0-9]/.test(pw),
+          symbol: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw),
+        };
+      }
+
+      function updatePwUI(res) {
+        reqLen.style.color = res.length ? 'green' : 'red';
+        reqUpper.style.color = res.upper ? 'green' : 'red';
+        reqNumber.style.color = res.number ? 'green' : 'red';
+        reqSymbol.style.color = res.symbol ? 'green' : 'red';
+      }
+
+      pwInput.addEventListener('input', (e) => {
+        updatePwUI(checkPasswordRequirements(e.target.value));
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        const email = document.getElementById('regEmail').value.trim();
+        const password = pwInput.value;
+        const res = checkPasswordRequirements(password);
+        if (!res.length || !res.upper || !res.number || !res.symbol) {
+          msg.textContent = 'Password does not meet the security requirements.';
+          updatePwUI(res);
+          return;
+        }
+        try {
+          await addUser(email, password, 'user');
+          setSession(email);
+          location.href = 'dashboard.html';
+        } catch (err) {
+          msg.textContent = err.message || 'Registration failed';
+        }
+      });
+    </script>
   </body>
 </html>

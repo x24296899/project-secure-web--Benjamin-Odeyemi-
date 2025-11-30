@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Admin Panel — Secure Web</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>My Secure Web App</h1>
+      <nav>
+        <a href="index.html">Home</a>
+      </nav>
+    </header>
+    <main>
+      <h2>Admin Panel</h2>
+      <p id="welcome"></p>
+      <button id="logoutBtn">Logout</button>
+      <h3>Registered users</h3>
+      <table id="usersTable" border="1" cellpadding="6">
+        <thead>
+          <tr><th>Email</th><th>Role</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </main>
+    <script type="module">
+      import { getSession, clearSession, getAllUsers, deleteUser, getUser } from './users.js';
+
+      const welcome = document.getElementById('welcome');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const tbody = document.querySelector('#usersTable tbody');
+
+      function formatDate(ts) {
+        return new Date(ts).toLocaleString();
+      }
+
+      async function render() {
+        const email = getSession();
+        if (!email) {
+          location.href = 'login.html';
+          return;
+        }
+        const me = await getUser(email);
+        if (!me || me.role !== 'admin') {
+          location.href = 'login.html';
+          return;
+        }
+        welcome.textContent = `Logged in as ${email} (admin)`;
+        const users = await getAllUsers();
+        tbody.innerHTML = '';
+        users.forEach(u => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${u.email}</td>
+            <td>${u.role || ''}</td>
+            <td>${formatDate(u.createdAt)}</td>
+            <td>
+              <button data-email="${u.email}" class="del">Delete</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('button.del').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const email = e.currentTarget.dataset.email;
+            if (!confirm(`Delete user ${email}?`)) return;
+            await deleteUser(email);
+            render();
+          });
+        });
+      }
+
+      logoutBtn.addEventListener('click', () => {
+        clearSession();
+        location.href = 'index.html';
+      });
+
+      render();
+    </script>
+  </body>
+</html>
