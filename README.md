@@ -27,6 +27,4 @@ Quick ways to view the preview locally
 		 npm install -g serve
 		 serve -s . -l 8000
 
-Notes
-- These HTML files are static previews. They are not server-rendered templates and do not perform real authentication or session handling.
-- If you later want dynamic server-side rendering (Flask/Jinja), tell me and I can recreate the server templates and a small demo app.
+
