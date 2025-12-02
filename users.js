@@ -108,11 +108,73 @@ export function setSession(email) {
 }
 
 export function getSession() {
-  return sessionStorage.getItem('secure_user');
+  // Prefer sessionStorage (current tab). If absent, fall back to cookie session.
+  const s = sessionStorage.getItem('secure_user');
+  if (s) return s;
+  // read cookie
+  const m = document.cookie.match(/(?:^|; )secure_user=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
 export function clearSession() {
   sessionStorage.removeItem('secure_user');
+  // clear cookie as well
+  document.cookie = 'secure_user=; Max-Age=0; path=/; SameSite=Lax';
+}
+
+// Cookie helpers (client-side only). Note: HttpOnly cookies require a server.
+export function setSessionCookie(email, maxAgeSeconds = 3600) {
+  const encoded = encodeURIComponent(email);
+  // add Secure flag only if page is served over https
+  const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
+  // Use SameSite=Strict to reduce CSRF exposure (demo-level improvement)
+  document.cookie = `secure_user=${encoded}; Max-Age=${maxAgeSeconds}; path=/; SameSite=Strict${secureFlag}`;
+}
+
+export function getSessionCookie() {
+  const m = document.cookie.match(/(?:^|; )secure_user=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+// Failed login tracking (client-side only, demo)
+const LOCK_THRESHOLD = 3; // attempts
+const LOCK_SECONDS = 60; // lock duration in seconds
+
+function _failedKey(email) {
+  return `failed:${email}`;
+}
+
+export function getLockInfo(email) {
+  const raw = localStorage.getItem(_failedKey(email));
+  if (!raw) return { count: 0, lockedUntil: 0 };
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return { count: 0, lockedUntil: 0 };
+  }
+}
+
+export function recordFailedAttempt(email) {
+  const key = _failedKey(email);
+  const now = Date.now();
+  const info = getLockInfo(email);
+  // if currently locked, keep lock
+  if (info.lockedUntil && info.lockedUntil > now) {
+    return info;
+  }
+  let count = (info.count || 0) + 1;
+  let lockedUntil = 0;
+  if (count >= LOCK_THRESHOLD) {
+    lockedUntil = now + LOCK_SECONDS * 1000;
+    count = 0; // reset count after lock
+  }
+  const nxt = { count, lockedUntil };
+  localStorage.setItem(key, JSON.stringify(nxt));
+  return nxt;
+}
+
+export function resetFailedAttempts(email) {
+  localStorage.removeItem(_failedKey(email));
 }
 
 // Ensure a default admin user exists (for demo). Call this on app start.

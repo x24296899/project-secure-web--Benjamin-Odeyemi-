@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin — Users & Reservations</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header style="position:relative;">
+    <h1>Admin — Users</h1>
+    <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
+    <nav><a href="admin.html">Admin Panel</a> | <a href="admin-reservations.html">Reservations</a> | <a href="admin-tables.html">Tables</a></nav>
+  </header>
+  <main>
+    <section>
+      <h2>Registered users and their reservations</h2>
+      <table id="users" border="1" cellpadding="6">
+        <thead><tr><th>Email</th><th>Role</th><th>Registered</th><th>Reservations</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getSession, getUser, clearSession, getAllUsers } from './users.js';
+    import { getReservationsForUser, getTableById } from './reservations.js';
+
+  const profile = document.getElementById('profile');
+  const tbody = document.querySelector('#users tbody');
+
+    async function ensureAdmin() {
+      const email = getSession();
+      if (!email) { location.href = 'login.html'; return null; }
+      const me = await getUser(email);
+      if (!me || me.role !== 'admin') { location.href = 'login.html'; return null; }
+      profile.textContent = '';
+      const span = document.createElement('span'); span.textContent = `Logged in as ${email} `;
+      const btn = document.createElement('button'); btn.id = 'logout'; btn.textContent = 'Logout';
+      profile.appendChild(span); profile.appendChild(btn);
+      btn.addEventListener('click', () => { clearSession(); location.href='index.html'; });
+      return me;
+    }
+
+    function fmt(dt) { return new Date(dt).toLocaleString(); }
+
+    async function render() {
+      const me = await ensureAdmin();
+      if (!me) return;
+      const users = await getAllUsers();
+      tbody.textContent = '';
+      for (const u of users) {
+        const tr = document.createElement('tr');
+        const tdEmail = document.createElement('td'); tdEmail.textContent = u.email;
+        const tdRole = document.createElement('td'); tdRole.textContent = u.role || '';
+        const tdCreated = document.createElement('td'); tdCreated.textContent = fmt(u.createdAt);
+        const tdRes = document.createElement('td');
+        const res = await getReservationsForUser(u.email);
+        if (!res.length) {
+          const em = document.createElement('em'); em.textContent = 'none'; tdRes.appendChild(em);
+        } else {
+          const ul = document.createElement('ul');
+          for (const r of res) {
+            const li = document.createElement('li');
+            const table = await getTableById(r.tableId);
+            li.textContent = `${fmt(r.datetimeISO)} - ${table ? table.name : r.tableId} (${r.partySize}p)`;
+            ul.appendChild(li);
+          }
+          tdRes.appendChild(ul);
+        }
+        tr.appendChild(tdEmail); tr.appendChild(tdRole); tr.appendChild(tdCreated); tr.appendChild(tdRes);
+        tbody.appendChild(tr);
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>

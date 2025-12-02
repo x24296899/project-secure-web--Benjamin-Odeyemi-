@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
+  <title>Make a Reservation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+    <h1>Reservations</h1>
+    <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
+    <nav><a href="home.html">Home</a> | <a href="dashboard.html">Dashboard</a></nav>
+  </header>
+
+  <main>
+    <section id="make-reservation">
+      <h2>Create a reservation</h2>
+      <form id="res-form">
+        <label>Date: <input type="date" id="res-date" required></label>
+        <label>Time: <input type="time" id="res-time" required></label>
+        <label>Party size: <input type="number" id="res-party" min="1" max="20" value="2" required></label>
+        <label>Duration (minutes):
+          <select id="res-duration">
+            <option value="60">60</option>
+            <option value="90">90</option>
+            <option value="120">120</option>
+          </select>
+        </label>
+        <div>
+          <button type="button" id="check-availability">Check availability</button>
+        </div>
+      </form>
+
+      <div id="availability"></div>
+    </section>
+
+    <section id="my-reservations">
+      <h2>My reservations</h2>
+      <ul id="res-list"></ul>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getSession, clearSession } from './users.js';
+    import { seedTables, getAvailableTables, addReservation, getReservationsForUser, getTableById, getTables, deleteReservation } from './reservations.js';
+
+    const profile = document.getElementById('profile');
+    const session = getSession();
+    profile.textContent = '';
+    if (!session) {
+      const a = document.createElement('a'); a.href = 'login.html'; a.textContent = 'Log in';
+      profile.appendChild(a);
+    } else {
+      const txt = document.createElement('span'); txt.textContent = 'Signed in as ';
+      const strong = document.createElement('strong'); strong.textContent = session;
+      const btn = document.createElement('button'); btn.id = 'logout'; btn.textContent = 'Logout';
+      profile.appendChild(txt); profile.appendChild(strong); profile.appendChild(document.createTextNode(' ')); profile.appendChild(btn);
+      btn.addEventListener('click', () => { clearSession(); location.href = 'login.html'; });
+    }
+
+    async function refreshMyReservations() {
+      if (!session) return;
+      const list = document.getElementById('res-list');
+      list.textContent = '';
+      const res = await getReservationsForUser(session);
+      if (!res.length) {
+        const li = document.createElement('li'); li.textContent = 'No reservations yet'; list.appendChild(li);
+        return;
+      }
+      // sort by datetime
+      res.sort((a,b) => new Date(a.datetimeISO) - new Date(b.datetimeISO));
+      for (const r of res) {
+        const table = await getTableById(r.tableId);
+        const li = document.createElement('li');
+        li.appendChild(document.createTextNode(`${new Date(r.datetimeISO).toLocaleString()} · Table ${table ? table.name : r.tableId} · ${r.partySize} people `));
+        const btn = document.createElement('button'); btn.dataset.id = r.id; btn.className = 'cancel'; btn.textContent = 'Cancel';
+        li.appendChild(btn);
+        list.appendChild(li);
+      }
+      // attach cancel handlers
+      list.querySelectorAll('.cancel').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.dataset.id;
+          await deleteReservation(id);
+          refreshMyReservations();
+        });
+      });
+    }
+
+    // On load, seed tables and refresh reservations
+    (async () => {
+      await seedTables();
+      refreshMyReservations();
+    })();
+
+    document.getElementById('check-availability').addEventListener('click', async () => {
+      if (!session) { alert('Please log in first'); location.href = 'login.html'; return; }
+      const date = document.getElementById('res-date').value;
+      const time = document.getElementById('res-time').value;
+      const party = Number(document.getElementById('res-party').value) || 1;
+      const duration = Number(document.getElementById('res-duration').value) || 60;
+      if (!date || !time) { alert('Please pick date and time'); return; }
+      const iso = new Date(`${date}T${time}`).toISOString();
+
+      const avail = await getAvailableTables(iso, duration, party);
+      const container = document.getElementById('availability');
+      container.textContent = '';
+      if (!avail.length) {
+        const p = document.createElement('p'); p.textContent = 'No tables available for that time and party size.'; container.appendChild(p);
+        return;
+      }
+      const ul = document.createElement('ul');
+      for (const t of avail) {
+        const li = document.createElement('li');
+        li.appendChild(document.createTextNode(`Table ${t.name} (capacity ${t.capacity}) `));
+        const btn = document.createElement('button'); btn.dataset.id = t.id; btn.className = 'reserve'; btn.textContent = 'Reserve';
+        li.appendChild(btn);
+        ul.appendChild(li);
+      }
+      container.appendChild(ul);
+      // attach reserve handlers
+      container.querySelectorAll('.reserve').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const tableId = e.currentTarget.dataset.id;
+          try {
+            await addReservation(tableId, session, iso, duration, party);
+            alert('Reservation created');
+            container.textContent = '';
+            refreshMyReservations();
+          } catch (err) {
+            alert('Failed to create reservation: ' + err.message);
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

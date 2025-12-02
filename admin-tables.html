@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
+  <title>Admin — Tables</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Admin — Tables</h1>
+    <nav><a href="admin.html">Admin Home</a> | <a href="admin-reservations.html">Reservations</a></nav>
+  <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
+  </header>
+  <main>
+    <section>
+      <h2>Existing tables</h2>
+      <table id="tables" border="1" cellpadding="6">
+        <thead><tr><th>ID</th><th>Name</th><th>Capacity</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section style="margin-top:16px;">
+      <h2>Add table</h2>
+      <form id="addForm">
+        <label>Name: <input id="tname" required></label>
+        <label>Capacity: <input id="tcap" type="number" min="1" value="2" required></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getSession, getUser, clearSession } from './users.js';
+    import { getTables, addTable, updateTable, deleteTable, getAllReservations } from './reservations.js';
+
+  const ui = document.getElementById('profile');
+    const tbody = document.querySelector('#tables tbody');
+    const addForm = document.getElementById('addForm');
+
+    async function ensureAdmin() {
+      const email = getSession();
+      if (!email) { location.href = 'login.html'; return null; }
+      const me = await getUser(email);
+      if (!me || me.role !== 'admin') { location.href = 'login.html'; return null; }
+  ui.textContent = '';
+  const tspan = document.createElement('span'); tspan.textContent = `Logged in as ${email} `;
+  const btn = document.createElement('button'); btn.id = 'logout'; btn.textContent = 'Logout';
+  ui.appendChild(tspan); ui.appendChild(btn);
+      document.getElementById('logout').addEventListener('click', () => { clearSession(); location.href = 'index.html'; });
+      return me;
+    }
+
+    async function render() {
+      const me = await ensureAdmin();
+      if (!me) return;
+      const tables = await getTables();
+      tbody.textContent = '';
+      for (const t of tables) {
+        const tr = document.createElement('tr');
+        const tdId = document.createElement('td'); tdId.textContent = t.id;
+        const tdName = document.createElement('td'); const nameSpan = document.createElement('span'); nameSpan.className = 'name'; nameSpan.textContent = t.name; tdName.appendChild(nameSpan);
+        const tdCap = document.createElement('td'); const capSpan = document.createElement('span'); capSpan.className = 'cap'; capSpan.textContent = t.capacity; tdCap.appendChild(capSpan);
+        const tdActions = document.createElement('td');
+        const editBtn = document.createElement('button'); editBtn.dataset.id = t.id; editBtn.className = 'edit'; editBtn.textContent = 'Edit';
+        const delBtn = document.createElement('button'); delBtn.dataset.id = t.id; delBtn.className = 'del'; delBtn.textContent = 'Delete';
+        tdActions.appendChild(editBtn); tdActions.appendChild(delBtn);
+        tr.appendChild(tdId); tr.appendChild(tdName); tr.appendChild(tdCap); tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+
+      tbody.querySelectorAll('button.edit').forEach(btn => btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.dataset.id;
+  const tr = e.currentTarget.closest('tr');
+  const nameSpan = tr.querySelector('.name');
+  const capSpan = tr.querySelector('.cap');
+  const curName = nameSpan.textContent;
+  const curCap = capSpan.textContent;
+  nameSpan.textContent = '';
+  const nameInput = document.createElement('input'); nameInput.value = curName; nameInput.className = 'edit-name'; nameSpan.appendChild(nameInput);
+  capSpan.textContent = '';
+  const capInput = document.createElement('input'); capInput.type = 'number'; capInput.min = 1; capInput.value = curCap; capInput.className = 'edit-cap'; capSpan.appendChild(capInput);
+        e.currentTarget.textContent = 'Save';
+        e.currentTarget.classList.remove('edit');
+        e.currentTarget.classList.add('save');
+        e.currentTarget.addEventListener('click', async (ev) => {
+          const newName = tr.querySelector('.edit-name').value.trim();
+          const newCap = Number(tr.querySelector('.edit-cap').value) || 1;
+          try {
+            await updateTable(id, { name: newName, capacity: newCap });
+            render();
+          } catch (err) { alert('Failed to update: ' + err.message); }
+        }, { once: true });
+      }));
+
+      tbody.querySelectorAll('button.del').forEach(btn => btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.dataset.id;
+        // check for future reservations
+        try {
+          if (!confirm('Delete this table? This will be blocked if it has future reservations.')) return;
+          await deleteTable(id);
+          render();
+        } catch (err) { alert('Failed to delete table: ' + err.message); }
+      }));
+    }
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('tname').value.trim();
+      const cap = Number(document.getElementById('tcap').value) || 1;
+      try {
+        await addTable(name, cap);
+        addForm.reset();
+        render();
+      } catch (err) { alert('Failed to add table: ' + err.message); }
+    });
+
+    render();
+  </script>
+</body>
+</html>

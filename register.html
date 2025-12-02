@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
     <header>
       <h1>My Secure Web App</h1>
       <nav>
@@ -13,35 +14,44 @@
       </nav>
     </header>
     <main>
-      <h2>Register</h2>
-      <form id="registerForm" method="POST" action="#">
+      <div class="center-wrapper">
+        <h2>Register</h2>
+        <form id="registerForm" method="POST" action="#">
         <label>Email:</label>
         <input id="regEmail" name="email" type="email" required>
 
-        <label>Password:</label>
-        <input id="regPassword" name="password" type="password" required>
+  <label>Password:</label>
+  <input id="regPassword" name="password" type="password" required>
+
+  <label>Confirm password:</label>
+  <input id="regPasswordConfirm" name="password_confirm" type="password" required>
+
+  <div id="pwMatch" style="margin-top:8px; font-weight:600;"></div>
 
         <div id="pwRequirements">
           <p>Password must meet the following:</p>
           <ul>
-            <li id="pwLen">• At least 8 characters</li>
-            <li id="pwUpper">• At least one uppercase letter (A-Z)</li>
-            <li id="pwNumber">• At least one number (0-9)</li>
-            <li id="pwSymbol">• At least one symbol (e.g. !@#$%)</li>
+            <li id="pwLen">At least 8 characters</li>
+            <li id="pwUpper">At least one uppercase letter (A-Z)</li>
+            <li id="pwNumber">At least one number (0-9)</li>
+            <li id="pwSymbol">At least one symbol (e.g. !@#$%)</li>
           </ul>
         </div>
 
         <input type="hidden" name="role" value="user">
         <button type="submit">Register</button>
-      </form>
+        </form>
+      </div>
       <p id="regMessage" style="color:red"></p>
     </main>
     <script type="module">
-      import { addUser, setSession } from './users.js';
+  import { addUser, setSession, setSessionCookie } from './users.js';
 
       const form = document.getElementById('registerForm');
       const msg = document.getElementById('regMessage');
-      const pwInput = document.getElementById('regPassword');
+  const pwInput = document.getElementById('regPassword');
+  const pwConfirm = document.getElementById('regPasswordConfirm');
+  const pwMatch = document.getElementById('pwMatch');
       const reqLen = document.getElementById('pwLen');
       const reqUpper = document.getElementById('pwUpper');
       const reqNumber = document.getElementById('pwNumber');
@@ -67,20 +77,43 @@
         updatePwUI(checkPasswordRequirements(e.target.value));
       });
 
+      // show live match status
+      function updateMatchUI() {
+        const a = pwInput.value;
+        const b = pwConfirm.value;
+        if (!a && !b) { pwMatch.textContent = ''; return; }
+        if (a === b) {
+          pwMatch.style.color = 'green';
+          pwMatch.textContent = 'Passwords match';
+        } else {
+          pwMatch.style.color = 'red';
+          pwMatch.textContent = 'Passwords do not match';
+        }
+      }
+      pwConfirm.addEventListener('input', updateMatchUI);
+      pwInput.addEventListener('input', updateMatchUI);
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         msg.textContent = '';
         const email = document.getElementById('regEmail').value.trim();
         const password = pwInput.value;
+        const passwordConfirm = pwConfirm.value;
         const res = checkPasswordRequirements(password);
         if (!res.length || !res.upper || !res.number || !res.symbol) {
           msg.textContent = 'Password does not meet the security requirements.';
           updatePwUI(res);
           return;
         }
+        if (password !== passwordConfirm) {
+          msg.textContent = 'Passwords do not match.';
+          updateMatchUI();
+          return;
+        }
         try {
           await addUser(email, password, 'user');
           setSession(email);
+          setSessionCookie(email, 3600);
           location.href = 'dashboard.html';
         } catch (err) {
           msg.textContent = err.message || 'Registration failed';

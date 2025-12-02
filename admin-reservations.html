@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin — Reservations</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Admin — Reservations</h1>
+    <nav><a href="admin.html">Admin Home</a> | <a href="admin-tables.html">Manage Tables</a></nav>
+  <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
+  </header>
+  <main>
+    <section>
+      <h2>All reservations</h2>
+      <button id="refresh">Refresh</button>
+      <table id="resTable" border="1" cellpadding="6">
+        <thead><tr><th>ID</th><th>Date/time</th><th>Table</th><th>User</th><th>Party</th><th>Duration</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getSession, getUser, clearSession } from './users.js';
+    import { getAllReservations, getTableById, deleteReservation, addReservation, getAvailableTables, getTables } from './reservations.js';
+
+  const ui = document.getElementById('profile');
+    const tbody = document.querySelector('#resTable tbody');
+    const refreshBtn = document.getElementById('refresh');
+
+    async function ensureAdmin() {
+      const email = getSession();
+      if (!email) { location.href = 'login.html'; return null; }
+      const me = await getUser(email);
+      if (!me || me.role !== 'admin') { location.href = 'login.html'; return null; }
+  ui.textContent = '';
+  const span = document.createElement('span'); span.textContent = `Logged in as ${email} `;
+  const btn = document.createElement('button'); btn.id = 'logout'; btn.textContent = 'Logout';
+  ui.appendChild(span); ui.appendChild(btn);
+  btn.addEventListener('click', () => { clearSession(); location.href = 'index.html'; });
+      return me;
+    }
+
+    function fmt(dt) { return new Date(dt).toLocaleString(); }
+
+    async function render() {
+      const me = await ensureAdmin();
+      if (!me) return;
+      const all = await getAllReservations();
+      tbody.textContent = '';
+      all.sort((a,b) => new Date(a.datetimeISO) - new Date(b.datetimeISO));
+      for (const r of all) {
+        const tr = document.createElement('tr');
+        const tdId = document.createElement('td'); tdId.textContent = r.id;
+        const tdDate = document.createElement('td'); tdDate.textContent = fmt(r.datetimeISO);
+        const table = await getTableById(r.tableId);
+        const tdTable = document.createElement('td'); tdTable.textContent = table ? table.name : r.tableId;
+        const tdUser = document.createElement('td'); tdUser.textContent = r.userEmail;
+        const tdParty = document.createElement('td'); tdParty.textContent = r.partySize;
+        const tdDur = document.createElement('td'); tdDur.textContent = (r.durationMinutes || 60) + ' min';
+        const tdActions = document.createElement('td');
+        const cancelBtn = document.createElement('button'); cancelBtn.dataset.id = r.id; cancelBtn.className = 'cancel'; cancelBtn.textContent = 'Cancel';
+        const reschedBtn = document.createElement('button'); reschedBtn.dataset.id = r.id; reschedBtn.className = 'resched'; reschedBtn.textContent = 'Reschedule';
+        const formHolder = document.createElement('div'); formHolder.className = 'resched-form'; formHolder.dataset.for = r.id; formHolder.style.display = 'none'; formHolder.style.marginTop = '8px';
+        tdActions.appendChild(cancelBtn); tdActions.appendChild(reschedBtn); tdActions.appendChild(formHolder);
+        tr.appendChild(tdId); tr.appendChild(tdDate); tr.appendChild(tdTable); tr.appendChild(tdUser); tr.appendChild(tdParty); tr.appendChild(tdDur); tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+
+      tbody.querySelectorAll('button.cancel').forEach(b => b.addEventListener('click', async (e) => {
+        const id = e.currentTarget.dataset.id;
+        if (!confirm('Cancel this reservation?')) return;
+        await deleteReservation(id);
+        render();
+      }));
+
+      tbody.querySelectorAll('button.resched').forEach(b => b.addEventListener('click', async (e) => {
+        const id = e.currentTarget.dataset.id;
+        const formHolder = document.querySelector(`.resched-form[data-for="${id}"]`);
+        if (formHolder.style.display === 'block') { formHolder.style.display = 'none'; return; }
+        // show form
+        const res = (await getAllReservations()).find(x => String(x.id) === String(id));
+  formHolder.textContent = '';
+        const date = document.createElement('input'); date.type='date'; date.value = new Date(res.datetimeISO).toISOString().slice(0,10);
+        const time = document.createElement('input'); time.type='time'; time.value = new Date(res.datetimeISO).toTimeString().slice(0,5);
+        const duration = document.createElement('select');
+        [60,90,120].forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; if (d === (res.durationMinutes||60)) o.selected = true; duration.appendChild(o); });
+        const submit = document.createElement('button'); submit.type='button'; submit.textContent='Apply';
+        const note = document.createElement('div'); note.style.marginTop='6px';
+        formHolder.appendChild(document.createTextNode('New date: ')); formHolder.appendChild(date);
+        formHolder.appendChild(document.createTextNode(' Time: ')); formHolder.appendChild(time);
+        formHolder.appendChild(document.createTextNode(' Duration: ')); formHolder.appendChild(duration);
+        formHolder.appendChild(submit); formHolder.appendChild(note);
+        formHolder.style.display = 'block';
+
+        submit.addEventListener('click', async () => {
+          const newIso = new Date(`${date.value}T${time.value}`).toISOString();
+          const newDur = Number(duration.value) || 60;
+          // We'll attempt to reschedule by deleting then re-adding. If add fails, restore original.
+          const original = { ...res };
+          try {
+            await deleteReservation(id);
+            // try adding with same table
+            await addReservation(original.tableId, original.userEmail, newIso, newDur, original.partySize);
+            alert('Rescheduled');
+            render();
+          } catch (err) {
+            // try to restore original reservation
+            try { await addReservation(original.tableId, original.userEmail, original.datetimeISO, original.durationMinutes || 60, original.partySize); } catch (e) { console.error('Failed to restore original reservation', e); }
+            note.textContent = 'Failed to reschedule: ' + err.message;
+          }
+        });
+      }));
+    }
+
+    refreshBtn.addEventListener('click', render);
+    render();
+  </script>
+</body>
+</html>

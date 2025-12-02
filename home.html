@@ -33,11 +33,11 @@
         }
         const user = await getUser(email);
         welcome.textContent = `Welcome, ${email} (${user.role || 'user'})`;
-        links.innerHTML = '';
+        links.textContent = '';
         if (user.role === 'admin') {
-          links.innerHTML += `<p><a href="admin.html">Go to Admin Panel</a></p>`;
+          const p = document.createElement('p'); const a = document.createElement('a'); a.href = 'admin.html'; a.textContent = 'Go to Admin Panel'; p.appendChild(a); links.appendChild(p);
         }
-        links.innerHTML += `<p><a href="dashboard.html">Go to Dashboard</a></p>`;
+        const p2 = document.createElement('p'); const a2 = document.createElement('a'); a2.href = 'dashboard.html'; a2.textContent = 'Go to Dashboard'; p2.appendChild(a2); links.appendChild(p2);
       })();
 
       logout.addEventListener('click', () => {

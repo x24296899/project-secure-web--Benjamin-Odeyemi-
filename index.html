@@ -6,8 +6,10 @@
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <header>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
+    <header style="position:relative;">
       <h1>My Secure Web App</h1>
+      <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
       <nav>
         <a href="index.html">Home</a>
       </nav>
@@ -23,6 +25,30 @@
 
       <p>Please log in or register to continue.</p>
     </main>
+    <script type="module">
+      import { getSession, getUser, clearSession } from './users.js';
+      (async function(){
+        const profile = document.getElementById('profile');
+        const s = getSession();
+        profile.textContent = '';
+        if (!s) {
+          const a1 = document.createElement('a'); a1.href = 'login.html'; a1.textContent = 'Log in';
+          const sep = document.createTextNode(' | ');
+          const a2 = document.createElement('a'); a2.href = 'register.html'; a2.textContent = 'Register';
+          profile.appendChild(a1); profile.appendChild(sep); profile.appendChild(a2);
+          return;
+        }
+        const me = await getUser(s);
+        const span = document.createElement('span'); span.textContent = 'Signed in as ';
+        const strong = document.createElement('strong'); strong.textContent = s;
+        profile.appendChild(span); profile.appendChild(strong);
+        if (me && me.role === 'admin') { profile.appendChild(document.createTextNode(' ')); const em = document.createElement('em'); em.textContent = '(admin)'; profile.appendChild(em); }
+        profile.appendChild(document.createTextNode(' '));
+        const btn = document.createElement('button'); btn.id = 'logout'; btn.textContent = 'Logout';
+        profile.appendChild(btn);
+        btn.addEventListener('click', ()=>{ clearSession(); location.href='index.html'; });
+      })();
+    </script>
   </body>
 </html>
 

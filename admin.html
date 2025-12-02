@@ -2,14 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
     <title>Admin Panel — Secure Web</title>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <header>
+    <header style="position:relative;">
       <h1>My Secure Web App</h1>
+      <div id="profile" style="position:absolute; right:12px; top:12px;"></div>
       <nav>
-        <a href="index.html">Home</a>
+        <a href="admin.html">Admin Panel</a> | <a href="admin-users.html">Users &amp; Reservations</a>
       </nav>
     </header>
     <main>
@@ -46,18 +48,33 @@
           location.href = 'login.html';
           return;
         }
-        welcome.textContent = `Logged in as ${email} (admin)`;
+    welcome.textContent = `Logged in as ${email} (admin)`;
+    const profile = document.getElementById('profile');
+      if (profile) {
+        profile.textContent = '';
+        const txt = document.createElement('span'); txt.textContent = 'Signed in as ';
+        const strong = document.createElement('strong'); strong.textContent = email;
+        const btn = document.createElement('button'); btn.id = 'logoutSmall'; btn.textContent = 'Logout';
+        profile.appendChild(txt); profile.appendChild(strong); profile.appendChild(document.createTextNode(' ')); profile.appendChild(btn);
+        btn.addEventListener('click', () => { clearSession(); location.href = 'index.html'; });
+      }
         const users = await getAllUsers();
-        tbody.innerHTML = '';
+  tbody.textContent = '';
         users.forEach(u => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${u.email}</td>
-            <td>${u.role || ''}</td>
-            <td>${formatDate(u.createdAt)}</td>
-            <td>
-              <button data-email="${u.email}" class="del">Delete</button>
-            </td>`;
+          const tdEmail = document.createElement('td'); tdEmail.textContent = u.email;
+          const tdRole = document.createElement('td'); tdRole.textContent = u.role || '';
+          const tdCreated = document.createElement('td'); tdCreated.textContent = formatDate(u.createdAt);
+          const tdActions = document.createElement('td');
+          // protect seeded admin and other admins from accidental deletion
+          const isSeedAdmin = u.email === 'admin@example.com';
+          const canDelete = !isSeedAdmin && (u.role !== 'admin');
+          if (canDelete) {
+            const btn = document.createElement('button'); btn.className = 'del'; btn.dataset.email = u.email; btn.textContent = 'Delete'; tdActions.appendChild(btn);
+          } else {
+            tdActions.appendChild(document.createTextNode(isSeedAdmin ? 'protected' : 'admin'));
+          }
+          tr.appendChild(tdEmail); tr.appendChild(tdRole); tr.appendChild(tdCreated); tr.appendChild(tdActions);
           tbody.appendChild(tr);
         });
         tbody.querySelectorAll('button.del').forEach(btn => {

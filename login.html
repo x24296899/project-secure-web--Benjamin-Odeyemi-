@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';">
     <title>Login — Secure Web</title>
     <link rel="stylesheet" href="style.css">
   </head>
@@ -13,23 +14,21 @@
       </nav>
     </header>
     <main>
-      <h2>Login</h2>
-      <form id="loginForm" method="POST" action="#">
+      <div class="center-wrapper">
+        <h2>Login</h2>
+        <form id="loginForm" method="POST" action="#">
         <label>Email:</label>
         <input id="loginEmail" name="email" type="email" required>
         <label>Password:</label>
         <input id="loginPassword" name="password" type="password" required>
-        <label>Role:</label>
-        <select id="loginRole" name="role">
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
+        <!-- Role selection removed: role is determined by the account stored in the database -->
         <button type="submit">Login</button>
-      </form>
+        </form>
+      </div>
       <p id="loginMessage" style="color:red"></p>
     </main>
     <script type="module">
-      import { verifyCredentials, setSession, getUser, ensureSeeded } from './users.js';
+  import { verifyCredentials, setSession, setSessionCookie, getUser, ensureSeeded, getLockInfo, recordFailedAttempt, resetFailedAttempts } from './users.js';
 
       // Ensure admin seeded for demo
       ensureSeeded();
@@ -41,25 +40,47 @@
         msg.textContent = '';
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
-        const selectedRole = document.getElementById('loginRole').value;
         try {
-          const ok = await verifyCredentials(email, password);
-          if (!ok) {
-            msg.textContent = 'Invalid credentials.';
+          // check lock status
+          const lock = getLockInfo(email);
+          const now = Date.now();
+          if (lock.lockedUntil && lock.lockedUntil > now) {
+            const wait = Math.ceil((lock.lockedUntil - now) / 1000);
+            msg.textContent = `Too many failed attempts. Try again in ${wait} seconds.`;
             return;
           }
+
+          const ok = await verifyCredentials(email, password);
+          if (!ok) {
+            const next = recordFailedAttempt(email);
+            const attemptsLeft = 3 - (next.count || 0);
+            if (next.lockedUntil && next.lockedUntil > Date.now()) {
+              const wait = Math.ceil((next.lockedUntil - Date.now()) / 1000);
+              msg.textContent = `Account locked due to multiple failed attempts. Try again in ${wait} seconds.`;
+            } else {
+              msg.textContent = `Invalid credentials. ${attemptsLeft} attempt(s) left.`;
+            }
+            return;
+          }
+
           const user = await getUser(email);
           if (!user) {
             msg.textContent = 'User record not found.';
             return;
           }
-          if ((user.role || 'user') !== selectedRole) {
-            msg.textContent = `Role mismatch: account is '${user.role || 'user'}'`;
-            return;
-          }
+          // Route by the stored account role (do not allow choosing a different role)
+          const actualRole = user.role || 'user';
+          // success: clear failed attempts
+          resetFailedAttempts(email);
           setSession(email);
-          // Redirect to generic home which routes by role
-          location.href = 'home.html';
+          // also set a session cookie so other tabs can detect the session
+          setSessionCookie(email, 3600);
+          // Route by role
+          if (actualRole === 'admin') {
+            location.href = 'admin.html';
+          } else {
+            location.href = 'reservations.html';
+          }
         } catch (err) {
           console.error(err);
           msg.textContent = 'Login failed';

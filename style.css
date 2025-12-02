@@ -40,6 +40,25 @@ form {
   margin-top: 20px;
 }
 
+/* Center wrapper for auth pages */
+.center-wrapper {
+  min-height: calc(100vh - 120px); /* allow for header/nav height */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.center-wrapper form {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
 label {
   display: block;
   margin-top: 10px;
