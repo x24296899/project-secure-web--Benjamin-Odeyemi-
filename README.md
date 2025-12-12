@@ -5,7 +5,6 @@ This repository contains a small static front-end preview of a "Secure Web" app.
 Files of interest
 - `index.html`, `login.html`, `register.html`, `base.html` — static preview pages (HTML)
 - `style.css` — stylesheet used by the preview pages
-- `LICENSE` — project license
 
 Quick ways to view the preview locally
 
