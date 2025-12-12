@@ -1,24 +1,8 @@
 
-# Secure Web — Client-side Restaurant Booking Demo
-
-This repository is a client-only, static demo of a small restaurant booking
-application implemented with plain HTML/CSS and vanilla JavaScript. All
-data and authentication are stored locally in the browser using IndexedDB so
-you can run the app without a backend server.
-
+# Secure Web — Client-side Restaurant Booking 
 ## Quick start
 
 - Open `index.html` in your browser. That opens the app UI.
-- If your browser blocks ES module imports when opened via `file://`, serve
-	the folder over HTTP. A simple way (if you have Python installed) is:
-
-```powershell
-# from the project root
-python -m http.server 3000
-# then open http://localhost:3000/index.html
-```
-
-Or use any static file server / editor extension (VS Code Live Server, etc.).
 
 ## Project overview
 
@@ -49,9 +33,6 @@ Files of interest
 
 ## Security controls implemented (front-end)
 
-The app is a demo; the following mitigations were applied at the front-end
-level to improve safety for a client-side demo:
-
 - Content Security Policy (CSP) meta tag present in pages (restricts sources).
 - Safe DOM updates: UI rendering uses `createElement` and `textContent`
 	instead of `innerHTML` wherever possible, which prevents HTML injection.
@@ -75,7 +56,7 @@ level to improve safety for a client-side demo:
 - `reservations.js` — tables and reservations store plus availability logic.
 - `style.css` — visual styling.
 
-## User roles and permissions (client-side)
+## User roles and permissions 
 
 - Two roles exist in the demo: `admin` and `user`.
 - Role is stored on the user record in IndexedDB. Admin-only pages check the
@@ -94,38 +75,11 @@ level to improve safety for a client-side demo:
 	There is no server or centralized persistence — data does not sync across
 	devices or browsers.
 
-## Limitations and important notes
-
-- This is a client-side demo; it is not secure for production. The main
-	limitations are:
-	- Password hashing is done in the browser using a single SHA-256 digest
-		(no per-user salt or iterations). This is weak compared to server-side
-		KDFs (bcrypt/argon2).
-	- Sessions are implemented with `sessionStorage` and a JS-set cookie. The
-		cookie is not HttpOnly and can be accessed by scripts if an XSS bug
-		exists.
-	- Role checks and authorization are enforced only in client JavaScript and
-		can be bypassed by a user who modifies the client code.
-	- Availability checks for reservations are not atomic across multiple
-		browser tabs; race conditions (double-booking) are possible in concurrent
-		usage.
-	- All data lives in the browser's IndexedDB and can be cleared by the
-		user or lost when the browser profile is removed.
-
-## Suggested next steps (if you want to make this production-ready)
-
-1. Move authentication and data storage to a server with a proper database.
-2. Use a server-side password hashing algorithm (bcrypt/argon2) with per-user
-	 salts.
-3. Use HttpOnly, Secure cookies for sessions and enforce server-side role
-	 checks on all sensitive endpoints.
-4. Implement atomic reservation logic on the server to avoid double-booking.
-
 ## Where to look in the code
 
 - `users.js` — user logic and session helpers.
 - `reservations.js` — tables/reservations and availability logic.
-- `register.html`, `login.html`, `admin-*.html`, `reservations.html` — UI pages.
+- `register.html`, `login.html`, `admin-*.html`, `reservations.html` .
 
 
 
