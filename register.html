@@ -47,8 +47,9 @@
     <script type="module">
   import { addUser, setSession, setSessionCookie } from './users.js';
 
-      const form = document.getElementById('registerForm');
-      const msg = document.getElementById('regMessage');
+    // Elements we interact with in the registration form
+    const form = document.getElementById('registerForm');
+    const msg = document.getElementById('regMessage');
   const pwInput = document.getElementById('regPassword');
   const pwConfirm = document.getElementById('regPasswordConfirm');
   const pwMatch = document.getElementById('pwMatch');
@@ -93,6 +94,12 @@
       pwConfirm.addEventListener('input', updateMatchUI);
       pwInput.addEventListener('input', updateMatchUI);
 
+      // When the user submits the register form it does the following:
+      // 1) Stop the browser from doing its default form submit.
+      // 2) Check the password meets the rules shown to the user.
+      // 3) Ensure the two password fields match.
+      // 4) Create the user in IndexedDB (addUser) and set a session marker.
+      // 5) Redirect to the dashboard on success.
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         msg.textContent = '';
@@ -111,8 +118,14 @@
           return;
         }
         try {
+          // addUser stores the user in the browser's IndexedDB. This is
+          // suitable for a local demo but not for a real application.
           await addUser(email, password, 'user');
+          // setSession stores a session marker in sessionStorage so other
+          // pages know the user is logged in for this browser tab.
           setSession(email);
+          // setSessionCookie is a demo convenience to allow other tabs to
+          // see the login; cookies set in JS are readable by scripts.
           setSessionCookie(email, 3600);
           location.href = 'dashboard.html';
         } catch (err) {

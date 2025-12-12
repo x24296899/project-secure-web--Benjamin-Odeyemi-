@@ -1,4 +1,6 @@
-// Simple IndexedDB wrapper for user CRUD, with SHA-256 password hashing (browser-side) for demo only
+// Simple IndexedDB user helpers.
+// Provides: openDb, add/get/update/delete users, password hashing,
+// session helpers, and failed-login tracking.
 const DB_NAME = 'secure_web_db';
 const STORE_NAME = 'users';
 const DB_VERSION = 1;
@@ -31,14 +33,13 @@ async function hashPassword(password) {
   return btoa(String.fromCharCode(...hashArray));
 }
 
+
 export async function addUser(email, password, role = 'user') {
-  // Check for existing user first using a separate readonly transaction.
+  // Add a new user to the local database.
   const existing = await getUser(email);
   if (existing) throw new Error('User already exists');
 
-  // Now open a readwrite transaction to add the user. Keep async work
-  // (like hashing) before adding so the transaction stays active only
-  // while performing the add() call.
+  // Hash the password then store the user record.
   const passwordHash = await hashPassword(password);
   const { store, tx } = await getStore('readwrite');
   store.add({ email, passwordHash, role, createdAt: Date.now() });
@@ -49,6 +50,7 @@ export async function addUser(email, password, role = 'user') {
 }
 
 export async function getUser(email) {
+  // Return the user object for the given email.
   const { store, tx } = await getStore('readonly');
   return new Promise((resolve, reject) => {
     const req = store.get(email);
@@ -67,8 +69,8 @@ export async function getAllUsers() {
 }
 
 export async function updateUser(email, patch) {
-  // Read the existing user first to avoid letting a readwrite
-  // transaction auto-commit while awaiting other async operations.
+  // Update fields on an existing user. If patch contains `password`
+  // it is hashed before saving.
   const current = await getUser(email);
   if (!current) throw new Error('User not found');
 
@@ -96,19 +98,21 @@ export async function deleteUser(email) {
 }
 
 export async function verifyCredentials(email, password) {
+  // Verify email + password by comparing hashes.
   const user = await getUser(email);
   if (!user) return false;
   const passwordHash = await hashPassword(password);
   return user.passwordHash === passwordHash;
 }
 
-// Session helpers (demo only)
+// Session helpers
 export function setSession(email) {
+  // Store a session marker for this tab.
   sessionStorage.setItem('secure_user', email);
 }
 
 export function getSession() {
-  // Prefer sessionStorage (current tab). If absent, fall back to cookie session.
+  // Return the current session user (tab-local), or cookie if present.
   const s = sessionStorage.getItem('secure_user');
   if (s) return s;
   // read cookie
@@ -117,17 +121,16 @@ export function getSession() {
 }
 
 export function clearSession() {
+  // Clear session marker and cookie.
   sessionStorage.removeItem('secure_user');
-  // clear cookie as well
   document.cookie = 'secure_user=; Max-Age=0; path=/; SameSite=Lax';
 }
 
-// Cookie helpers (client-side only). Note: HttpOnly cookies require a server.
+// Cookie helpers.
 export function setSessionCookie(email, maxAgeSeconds = 3600) {
+  // Set a cookie so other tabs can detect the session
   const encoded = encodeURIComponent(email);
-  // add Secure flag only if page is served over https
   const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-  // Use SameSite=Strict to reduce CSRF exposure (demo-level improvement)
   document.cookie = `secure_user=${encoded}; Max-Age=${maxAgeSeconds}; path=/; SameSite=Strict${secureFlag}`;
 }
 
@@ -136,7 +139,7 @@ export function getSessionCookie() {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-// Failed login tracking (client-side only, demo)
+// Failed login tracking
 const LOCK_THRESHOLD = 3; // attempts
 const LOCK_SECONDS = 60; // lock duration in seconds
 
@@ -177,13 +180,13 @@ export function resetFailedAttempts(email) {
   localStorage.removeItem(_failedKey(email));
 }
 
-// Ensure a default admin user exists (for demo). Call this on app start.
+// Ensure a default admin user exists 
 export async function ensureSeeded() {
   const adminEmail = 'admin@example.com';
   try {
     const existing = await getUser(adminEmail);
     if (!existing) {
-      // default admin password (demo only)
+      // default admin password
       await addUser(adminEmail, 'AdminPass123', 'admin');
       console.log('Seeded admin user:', adminEmail);
     }

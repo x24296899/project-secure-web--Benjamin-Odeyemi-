@@ -30,18 +30,28 @@
     <script type="module">
     import { verifyCredentials, setSession, setSessionCookie, getUser, ensureSeeded, getLockInfo, recordFailedAttempt, resetFailedAttempts } from './users.js';
 
-      // Ensure admin seeded for demo
+      // Ensure the demo admin account exists. This seeds a user in IndexedDB
+      // if it isn't already present. Good for trying the admin flows.
       ensureSeeded();
 
       const form = document.getElementById('loginForm');
       const msg = document.getElementById('loginMessage');
+
+      // When the user submits the login form it does the following:
+      // Steps (easy summary):
+      // 1) Prevent the normal form submission (we handle it in JS).
+      // 2) Check if the email is currently locked due to failed attempts.
+      // 3) Verify the email + password against the local database.
+      // 4) If successful: clear failed attempts, set session marker, and
+      //    redirect the user to the correct page based on role.
+      // 5) If failed: record a failed attempt and show a helpful message.
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         msg.textContent = '';
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
         try {
-          // check lock status
+          // check lock status (simple client-side protection)
           const lock = getLockInfo(email);
           const now = Date.now();
           if (lock.lockedUntil && lock.lockedUntil > now) {
@@ -50,8 +60,12 @@
             return;
           }
 
+          // verifyCredentials reads the stored user and compares the hash
+          // of the provided password. This is all local to the browser.
           const ok = await verifyCredentials(email, password);
           if (!ok) {
+            // recordFailedAttempt stores a small counter in localStorage
+            // so repeated failures cause a temporary lockout.
             const next = recordFailedAttempt(email);
             const attemptsLeft = 3 - (next.count || 0);
             if (next.lockedUntil && next.lockedUntil > Date.now()) {
@@ -63,18 +77,24 @@
             return;
           }
 
+          // The credentials matched. Load the user record to check role.
           const user = await getUser(email);
           if (!user) {
             msg.textContent = 'User record not found.';
             return;
           }
+
           // Route by the stored account role (do not allow choosing a different role)
           const actualRole = user.role || 'user';
-          // success: clear failed attempts
+
+          // success: clear failed attempts and set session marker
           resetFailedAttempts(email);
           setSession(email);
-          // also set a session cookie so other tabs can detect the session
+          // setSessionCookie creates a demo cookie so other tabs can see the
+          // login; note cookies set by JS are not HttpOnly (they are readable
+          // by scripts) so this is a demo-only convenience.
           setSessionCookie(email, 3600);
+
           // Route by role
           if (actualRole === 'admin') {
             location.href = 'admin.html';
